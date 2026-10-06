@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { streamGenerate, searchReferences } from "@/lib/api";
+import { streamGenerate, type ThesisRef } from "@/lib/api";
 
 const MODULES = [
   { id: "problema", label: "Problema de Investigación" },
@@ -18,11 +18,6 @@ const MODULES = [
   { id: "referencias", label: "Referencias (APA 7)" },
 ];
 
-interface ThesisRef {
-  title: string; authors: string; institution: string;
-  country: string; year: string; source: string; origin: string; url: string;
-}
-
 export default function ModuleBuilder() {
   const [topic, setTopic] = useState("");
   const [ideas, setIdeas] = useState("");
@@ -31,24 +26,27 @@ export default function ModuleBuilder() {
   const [loading, setLoading] = useState(false);
   const [refs, setRefs] = useState<ThesisRef[]>([]);
   const [showRefs, setShowRefs] = useState(false);
+  const [error, setError] = useState("");
 
   async function generate() {
     if (!topic.trim()) return;
     setLoading(true);
+    setError("");
     setContent("");
+    setRefs([]);
     try {
-      const data = await searchReferences(topic);
-      setRefs(data.results || []);
-      await streamGenerate(topic, module, ideas, (chunk) =>
-        setContent((prev) => prev + chunk)
-      );
+      await streamGenerate(topic, module, ideas, {
+        onRefs: (r) => setRefs(r),
+        onChunk: (chunk) => setContent((prev) => prev + chunk),
+      });
+    } catch (e: any) {
+      setError(e?.message || "Error desconocido al generar.");
     } finally {
       setLoading(false);
     }
   }
 
-  const generated = MODULES.filter((m) => m.id !== module).length - 4;
-  const progress = content ? ((generated + 1) / MODULES.length) * 100 : 0;
+  const progress = content ? ((MODULES.findIndex((m) => m.id === module) + 1) / MODULES.length) * 100 : 0;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
@@ -100,6 +98,12 @@ export default function ModuleBuilder() {
             </div>
           </div>
         </Card>
+
+        {error && (
+          <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">
+            ⚠️ {error}
+          </div>
+        )}
 
         {/* Editor con streaming */}
         <Card className="min-h-[420px]">

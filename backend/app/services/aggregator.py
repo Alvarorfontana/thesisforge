@@ -21,8 +21,17 @@ CONNECTORS = [
 async def search_all(query: str, max_results: int = None) -> list[ThesisRef]:
     """Consulta todos los repositorios en paralelo y unifica resultados."""
     max_results = max_results or settings.max_results_per_source
-    tasks = [c.search(query, max_results) for c in CONNECTORS]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    tasks = [asyncio.create_task(c.search(query, max_results)) for c in CONNECTORS]
+    # Tope total de 20 s: si un repositorio se cuelga, seguimos con los demás.
+    done, pending = await asyncio.wait(tasks, timeout=20)
+    for t in pending:
+        t.cancel()
+    results = []
+    for t in done:
+        try:
+            results.append(t.result())
+        except Exception:
+            continue
 
     seen, out = set(), []
     for res in results:

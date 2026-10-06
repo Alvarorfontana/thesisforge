@@ -30,13 +30,14 @@ def _stream_openrouter(prompt: str):
         with httpx.Client(timeout=180) as client:
             with client.stream("POST", url, headers=headers, json=payload) as r:
                 if r.status_code == 401:
-                    yield "Error 401: key de OpenRouter inválida. Verificá OPENROUTER_API_KEY."
+                    yield "Error 401: key de OpenRouter inválida o revocada. Creá una nueva en openrouter.ai/keys y cargala en Render."
                     return
                 if r.status_code == 429:
-                    yield "Error 429: límite de cuota del modelo gratuito alcanzado. Probá en unos minutos u otro modelo :free."
+                    yield "Error 429: límite del modelo gratuito alcanzado. Probá en unos minutos o cambiá OPENROUTER_MODEL por otro modelo :free."
                     return
                 if r.status_code != 200:
-                    yield f"Error de OpenRouter (HTTP {r.status_code})."
+                    detalle = r.read().decode("utf-8", "ignore")[:300]
+                    yield f"Error de OpenRouter (HTTP {r.status_code}). Detalle: {detalle}. Si dice que el modelo no existe, cambiá OPENROUTER_MODEL en Render."
                     return
                 for line in r.iter_lines():
                     if not line.startswith("data: "):
